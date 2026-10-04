@@ -33,6 +33,9 @@ button.x{background:none;color:var(--rd);padding:4px 8px}
 <main>
 <h1>🧾 Catatan Keuangan</h1>
 <div class="card">
+  <label>Jenis catatan</label>
+  <div class="row"><button type="button" id="jk">Uang keluar</button><button type="button" class="sec" id="jm">Uang masuk</button></div>
+  <div id="fotoBox">
   <label for="kam">Foto struk (dibaca otomatis)</label>
   <div class="row"><button type="button" id="kam">Buka kamera</button><button type="button" class="sec" id="gal">Pilih dari galeri</button></div>
   <div id="kmr" hidden style="margin-top:10px">
@@ -42,19 +45,25 @@ button.x{background:none;color:var(--rd);padding:4px 8px}
   <input id="foto" type="file" accept="image/*" capture="environment" hidden>
   <input id="foto2" type="file" accept="image/*" hidden>
   <div id="st0" style="font-size:13px;color:var(--mu);margin-top:6px">Foto yang terang dan lurus paling akurat. Hasil bacaan mengisi kolom di bawah, periksa dulu sebelum menyimpan.</div>
+  </div>
   <label for="tgl">Tanggal</label><input id="tgl" type="date">
-  <label for="toko">Toko / keterangan</label><input id="toko" type="text" placeholder="Contoh: Indomaret">
+  <label for="toko" id="ltoko">Toko / keterangan</label><input id="toko" type="text" placeholder="Contoh: Indomaret">
   <div class="row">
     <div><label for="kat">Kategori</label><select id="kat"></select></div>
-    <div><label for="tot">Total (Rp)</label><input id="tot" type="number" inputmode="numeric" min="0"></div>
+    <div><label for="tot">Jumlah (Rp)</label><input id="tot" type="number" inputmode="numeric" min="0"></div>
   </div>
   <p><button id="simpan" style="width:100%">Simpan</button></p>
   <div id="st"></div>
 </div>
 <div class="card">
-  <div style="color:var(--mu);font-size:13px">Pengeluaran bulan ini</div>
-  <div class="big" id="bln">Rp 0</div>
-  <div id="sum" style="margin-top:8px"></div>
+  <div style="color:var(--mu);font-size:13px">Saldo bulan ini</div>
+  <div class="big" id="saldo">Rp 0</div>
+  <div class="row" style="margin-top:8px">
+    <div><div style="font-size:12px;color:var(--mu)">Uang masuk</div><div id="masuk" style="font-weight:600;color:var(--ac)">Rp 0</div></div>
+    <div><div style="font-size:12px;color:var(--mu)">Uang keluar</div><div id="keluar" style="font-weight:600;color:var(--rd)">Rp 0</div></div>
+  </div>
+  <div style="font-size:12px;color:var(--mu);margin-top:12px">Pengeluaran per kategori</div>
+  <div id="sum" style="margin-top:4px"></div>
 </div>
 <div class="card">
   <div class="row" style="align-items:center;margin-bottom:6px">
@@ -63,7 +72,16 @@ button.x{background:none;color:var(--rd);padding:4px 8px}
   </div>
   <div id="list"></div>
 </div>
-<p style="text-align:center;font-size:12px;color:var(--mu)">Versi 5</p>
+<div class="card">
+  <strong>AI gratis (Gemini)</strong>
+  <label for="kunci">Kunci API Gemini</label>
+  <input id="kunci" type="password" placeholder="AIza..." autocomplete="off">
+  <label for="model">Model (opsional)</label>
+  <input id="model" type="text" placeholder="kosongkan agar otomatis" autocomplete="off">
+  <div class="row" style="margin-top:8px"><button id="sk">Simpan</button><button class="sec" id="hk">Hapus kunci</button></div>
+  <div id="st2" style="font-size:13px;color:var(--mu);margin-top:8px">Tanpa kunci, foto dibaca dengan pembaca teks biasa. Dengan kunci, foto struk dikirim ke Google untuk dibaca AI.</div>
+</div>
+<p style="text-align:center;font-size:12px;color:var(--mu)">Versi 7</p>
 </main>
 <script>
 const KAT=['Makan','Belanja','Transport','Tagihan','Kesehatan','Lainnya'];
@@ -73,7 +91,19 @@ const hari=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).
 let rows=[];
 try{rows=JSON.parse(localStorage.getItem('keuangan')||'[]')}catch(e){}
 const simpanLokal=()=>{try{localStorage.setItem('keuangan',JSON.stringify(rows))}catch(e){}};
-$('kat').innerHTML=KAT.map(k=>'<option>'+k+'</option>').join('');
+let jenis='keluar';
+const KATM=['Gaji','Usaha','Bonus','Hadiah','Lainnya'];
+function isiKat(){$('kat').innerHTML=(jenis==='masuk'?KATM:KAT).map(k=>'<option>'+k+'</option>').join('')}
+isiKat();
+function setJenis(j){
+  jenis=j;isiKat();
+  $('jk').className=j==='keluar'?'':'sec';$('jm').className=j==='masuk'?'':'sec';
+  $('fotoBox').hidden=j==='masuk';
+  if(j==='masuk')matikanKamera();
+  $('ltoko').textContent=j==='masuk'?'Sumber / keterangan':'Toko / keterangan';
+  $('toko').placeholder=j==='masuk'?'Contoh: Gaji Oktober':'Contoh: Indomaret';
+}
+$('jk').onclick=()=>setJenis('keluar');$('jm').onclick=()=>setJenis('masuk');
 $('tgl').value=hari();
 
 
@@ -113,29 +143,74 @@ function cariKat(t){for(const k in KATA)if(KATA[k].test(t))return k;return 'Lain
 function muatTesseract(){return new Promise((ok,no)=>{if(window.Tesseract)return ok();const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=ok;s.onerror=()=>no(new Error('muat'));document.head.append(s)})}
 function siapkan(f){return new Promise((ok,no)=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const s=Math.min(1,1800/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);const x=c.getContext('2d');try{x.filter='grayscale(1) contrast(1.4)'}catch(e){}x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c)};im.onerror=()=>no(new Error('gambar'));im.src=u})}
 
+const KG='keuangan_gemini',KM='keuangan_model';
+const MODELS=['gemini-3.8-flash','gemini-3.5-flash','gemini-2.5-flash'];
+const lsGet=k=>{try{return(localStorage.getItem(k)||'').trim()}catch(e){return ''}};
+const getKey=()=>lsGet(KG);
+$('kunci').value=getKey();$('model').value=lsGet(KM);
+$('sk').onclick=()=>{
+  const k=$('kunci').value.trim(),m=$('model').value.trim();
+  if(!k){$('st2').textContent='Tempel kunci dulu.';return}
+  try{localStorage.setItem(KG,k);localStorage.setItem(KM,m);$('st2').textContent='Tersimpan di HP ini. Foto struk berikutnya dibaca dengan AI.'}catch(e){$('st2').textContent='Gagal menyimpan.'}
+};
+$('hk').onclick=()=>{try{localStorage.removeItem(KG);localStorage.removeItem(KM)}catch(e){}$('kunci').value='';$('model').value='';$('st2').textContent='Kunci dihapus. Foto dibaca dengan pembaca teks biasa.'};
+
+async function bacaAI(c,key){
+  const b64=c.toDataURL('image/jpeg',.82).split(',')[1];
+  const pilih=lsGet(KM),daftar=pilih?[pilih]:MODELS;
+  const prompt='Baca struk belanja pada foto. Balas HANYA JSON: {"toko":"nama toko","tanggal":"YYYY-MM-DD atau kosong jika tidak terbaca","total":angka rupiah tanpa titik atau koma,"kategori":"salah satu dari: '+KAT.join(', ')+'"}';
+  let err='tidak diketahui';
+  for(const m of daftar){
+    const r=await fetch('https://generativelanguage.googleapis.com/v1beta/models/'+m+':generateContent',{method:'POST',headers:{'content-type':'application/json','x-goog-api-key':key},body:JSON.stringify({contents:[{parts:[{inline_data:{mime_type:'image/jpeg',data:b64}},{text:prompt}]}],generationConfig:{responseMimeType:'application/json',temperature:0}})});
+    if(!r.ok){
+      const j=await r.json().catch(()=>({}));
+      const msg=(j.error&&j.error.message)||('kode '+r.status);
+      if(r.status===403||/api key/i.test(msg))throw new Error('kunci tidak valid');
+      if(r.status===429)throw new Error('batas gratis tercapai, coba lagi nanti');
+      err=r.status===404?'model '+m+' tidak ditemukan':msg.slice(0,60);
+      continue;
+    }
+    const j=await r.json();
+    const parts=(j.candidates&&j.candidates[0]&&j.candidates[0].content&&j.candidates[0].content.parts)||[];
+    const o=JSON.parse(parts.map(p=>p.text||'').join('').replace(/```json|```/g,'').trim());
+    return {toko:String(o.toko||'').slice(0,40),tgl:/^\d{4}-\d{2}-\d{2}$/.test(o.tanggal||'')?o.tanggal:'',total:Math.round(Number(o.total)||0),kat:KAT.includes(o.kategori)?o.kategori:''};
+  }
+  throw new Error(err);
+}
+async function bacaOCR(c,st){
+  if(!ocr){
+    if(!navigator.onLine&&!window.Tesseract)throw new Error('offline');
+    st.textContent='Memuat pembaca teks (lama hanya di awal)...';
+    await muatTesseract();
+    ocr=await Tesseract.createWorker('eng',1,{logger:m=>{if(m.status==='recognizing text')st.textContent='Membaca struk '+Math.round(m.progress*100)+'%'}});
+  }
+  st.textContent='Membaca struk...';
+  const r=await ocr.recognize(c);
+  const teks=(r.data&&r.data.text)||'';
+  const b=teks.split('\n').map(s=>s.trim()).filter(Boolean);
+  return {toko:cariToko(b),tgl:cariTanggal(teks),total:cariTotal(b),kat:cariKat(b.slice(0,8).join(' '))};
+}
 async function baca(f){
   const st=$('st0');
   try{
     st.textContent='Menyiapkan foto...';
     const c=await siapkan(f);
-    if(!ocr){
-      if(!navigator.onLine&&!window.Tesseract){st.textContent='Pertama kali, pembaca foto butuh internet. Isi manual atau coba lagi saat online.';return}
-      st.textContent='Memuat pembaca teks (lama hanya di awal)...';
-      await muatTesseract();
-      ocr=await Tesseract.createWorker('eng',1,{logger:m=>{if(m.status==='recognizing text')st.textContent='Membaca struk '+Math.round(m.progress*100)+'%'}});
+    let d=null,via='',cat='';
+    const key=getKey();
+    if(key&&navigator.onLine){
+      st.textContent='Membaca struk dengan AI...';
+      try{d=await bacaAI(c,key);via='AI'}catch(e){cat=' (AI gagal: '+(e.message||'tidak diketahui')+')'}
     }
-    st.textContent='Membaca struk...';
-    const r=await ocr.recognize(c);
-    const teks=(r.data&&r.data.text)||'';
-    const b=teks.split('\n').map(s=>s.trim()).filter(Boolean);
-    const total=cariTotal(b),tgl=cariTanggal(teks),toko=cariToko(b);
-    if(toko)$('toko').value=toko;
-    if(tgl)$('tgl').value=tgl;
-    if(total)$('tot').value=total;
-    $('kat').value=cariKat(b.slice(0,8).join(' '));
-    const kurang=[!total&&'total',!tgl&&'tanggal',!toko&&'toko'].filter(Boolean);
-    st.textContent=kurang.length?'Terbaca sebagian. Isi manual: '+kurang.join(', ')+'.':'Selesai dibaca. Periksa dulu, lalu tekan Simpan.';
-  }catch(err){st.textContent='Gagal membaca struk. Pastikan internet aktif saat pertama kali, atau isi manual.'}
+    if(!d){d=await bacaOCR(c,st);via='pembaca teks'}
+    if(d.toko)$('toko').value=d.toko;
+    if(d.tgl)$('tgl').value=d.tgl;
+    if(d.total)$('tot').value=d.total;
+    if(d.kat)$('kat').value=d.kat;
+    const kurang=[!d.total&&'total',!d.tgl&&'tanggal',!d.toko&&'toko'].filter(Boolean);
+    st.textContent='Dibaca dengan '+via+cat+'. '+(kurang.length?'Isi manual: '+kurang.join(', ')+'.':'Periksa dulu, lalu tekan Simpan.');
+  }catch(err){
+    st.textContent=err&&err.message==='offline'?'Pertama kali, pembaca foto butuh internet. Isi manual atau coba lagi saat online.':'Gagal membaca struk. Pastikan internet aktif, atau isi manual.';
+  }
 }
 [$('foto'),$('foto2')].forEach(i=>i.addEventListener('change',()=>{const f=i.files[0];if(f)baca(f)}));
 let strm=null;
@@ -164,30 +239,41 @@ $('gal').onclick=()=>$('foto2').click();
 $('simpan').onclick=()=>{
   const total=Number($('tot').value);
   if(!total||total<=0){$('st').textContent='Isi total pengeluaran dulu.';return}
-  rows.push({id:Date.now(),tgl:$('tgl').value||hari(),toko:$('toko').value.trim()||'-',kat:$('kat').value,total});
+  rows.push({id:Date.now(),tgl:$('tgl').value||hari(),toko:$('toko').value.trim()||'-',kat:$('kat').value,total,jenis});
   simpanLokal();
   $('toko').value='';$('tot').value='';$('foto').value='';$('foto2').value='';$('tgl').value=hari();
   $('st').textContent='Tersimpan.';render();
 };
 
+const jns=r=>r.jenis==='masuk'?'masuk':'keluar';
+const jml=(l,j)=>l.filter(r=>jns(r)===j).reduce((a,r)=>a+r.total,0);
 function render(){
   const bulan=hari().slice(0,7);
   const ini=rows.filter(r=>r.tgl.slice(0,7)===bulan);
-  $('bln').textContent=rp(ini.reduce((a,r)=>a+r.total,0));
-  const per={};ini.forEach(r=>per[r.kat]=(per[r.kat]||0)+r.total);
-  $('sum').innerHTML=Object.entries(per).sort((a,b)=>b[1]-a[1]).map(([k,v])=>'<div class="sm"><span>'+k+'</span><span>'+rp(v)+'</span></div>').join('')||'<div style="color:var(--mu)">Belum ada catatan bulan ini.</div>';
+  const m=jml(ini,'masuk'),k=jml(ini,'keluar');
+  $('masuk').textContent=rp(m);$('keluar').textContent=rp(k);
+  $('saldo').textContent=(m-k<0?'-':'')+rp(Math.abs(m-k));
+  const per={};ini.filter(r=>jns(r)==='keluar').forEach(r=>per[r.kat]=(per[r.kat]||0)+r.total);
+  const S=$('sum');S.textContent='';
+  const es=Object.entries(per).sort((a,b)=>b[1]-a[1]);
+  es.forEach(([x,v])=>{const d=document.createElement('div');d.className='sm';const a=document.createElement('span');a.textContent=x;const b=document.createElement('span');b.textContent=rp(v);d.append(a,b);S.append(d)});
+  if(!es.length){const d=document.createElement('div');d.style.color='var(--mu)';d.textContent='Belum ada pengeluaran bulan ini.';S.append(d)}
   const L=$('list');L.textContent='';
   [...rows].sort((a,b)=>b.tgl.localeCompare(a.tgl)||b.id-a.id).forEach(r=>{
+    const msk=jns(r)==='masuk';
     const d=document.createElement('div');d.className='it';
-    const m=document.createElement('div');m.className='m';
-    const t=document.createElement('div');t.textContent=r.toko+' · '+rp(r.total);
-    const s=document.createElement('small');s.textContent=r.tgl+' · '+r.kat;
-    m.append(t,s);
+    const mm=document.createElement('div');mm.className='m';
+    const t=document.createElement('div');
+    const tx=document.createElement('span');tx.textContent=r.toko;
+    const am=document.createElement('span');am.textContent=' · '+(msk?'+':'-')+rp(r.total);am.style.color=msk?'var(--ac)':'var(--rd)';
+    t.append(tx,am);
+    const sm=document.createElement('small');sm.textContent=r.tgl+' · '+(msk?'Masuk':'Keluar')+' · '+r.kat;
+    mm.append(t,sm);
     const x=document.createElement('button');x.className='x';x.textContent='Hapus';
     x.onclick=()=>{rows=rows.filter(q=>q.id!==r.id);simpanLokal();render()};
-    d.append(m,x);L.append(d);
+    d.append(mm,x);L.append(d);
   });
-  if(!rows.length)L.innerHTML='<div style="color:var(--mu)">Belum ada riwayat.</div>';
+  if(!rows.length){const d=document.createElement('div');d.style.color='var(--mu)';d.textContent='Belum ada riwayat.';L.append(d)}
 }
 
 function unduh(blob,nama){
@@ -197,14 +283,17 @@ function unduh(blob,nama){
 $('xl').onclick=()=>{
   if(!rows.length){$('st').textContent='Belum ada data untuk diunduh.';return}
   const data=[...rows].sort((a,b)=>a.tgl.localeCompare(b.tgl));
+  const J=r=>jns(r)==='masuk'?'Masuk':'Keluar';
   if(window.XLSX){
     const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Tanggal','Toko','Kategori','Total (Rp)'],...data.map(r=>[r.tgl,r.toko,r.kat,r.total])]),'Catatan');
-    const per={};data.forEach(r=>{const k=r.tgl.slice(0,7)+'|'+r.kat;per[k]=(per[k]||0)+r.total});
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Bulan','Kategori','Total (Rp)'],...Object.entries(per).sort().map(([k,v])=>[...k.split('|'),v])]),'Ringkasan');
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Tanggal','Jenis','Toko / sumber','Kategori','Jumlah (Rp)'],...data.map(r=>[r.tgl,J(r),r.toko,r.kat,r.total])]),'Catatan');
+    const bl={};data.forEach(r=>{const b=r.tgl.slice(0,7);bl[b]=bl[b]||[0,0];bl[b][jns(r)==='masuk'?0:1]+=r.total});
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Bulan','Uang masuk','Uang keluar','Saldo'],...Object.keys(bl).sort().map(b=>[b,bl[b][0],bl[b][1],bl[b][0]-bl[b][1]])]),'Ringkasan');
+    const kt={};data.forEach(r=>{const k=r.tgl.slice(0,7)+'|'+J(r)+'|'+r.kat;kt[k]=(kt[k]||0)+r.total});
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Bulan','Jenis','Kategori','Jumlah (Rp)'],...Object.entries(kt).sort().map(([k,v])=>[...k.split('|'),v])]),'Per kategori');
     unduh(new Blob([XLSX.write(wb,{bookType:'xlsx',type:'array'})],{type:'application/octet-stream'}),'catatan-keuangan.xlsx');
   }else{
-    const csv='Tanggal,Toko,Kategori,Total\n'+data.map(r=>[r.tgl,'"'+r.toko.replace(/"/g,'""')+'"',r.kat,r.total].join(',')).join('\n');
+    const csv='Tanggal,Jenis,Toko / sumber,Kategori,Jumlah\n'+data.map(r=>[r.tgl,J(r),'"'+r.toko.replace(/"/g,'""')+'"',r.kat,r.total].join(',')).join('\n');
     unduh(new Blob([csv],{type:'text/csv'}),'catatan-keuangan.csv');
     $('st').textContent='Pustaka Excel belum termuat, file diunduh sebagai CSV (bisa dibuka di Excel).';
   }
