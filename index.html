@@ -34,7 +34,11 @@ button.x{background:none;color:var(--rd);padding:4px 8px}
 <h1>🧾 Catatan Keuangan</h1>
 <div class="card">
   <label for="kam">Foto struk (dibaca otomatis)</label>
-  <div class="row"><button type="button" id="kam">Ambil foto</button><button type="button" class="sec" id="gal">Pilih dari galeri</button></div>
+  <div class="row"><button type="button" id="kam">Buka kamera</button><button type="button" class="sec" id="gal">Pilih dari galeri</button></div>
+  <div id="kmr" hidden style="margin-top:10px">
+    <video id="vid" playsinline muted autoplay style="width:100%;border-radius:8px;background:#000"></video>
+    <div class="row" style="margin-top:8px"><button type="button" id="jepret">Ambil foto</button><button type="button" class="sec" id="tutup">Batal</button></div>
+  </div>
   <input id="foto" type="file" accept="image/*" capture="environment" hidden>
   <input id="foto2" type="file" accept="image/*" hidden>
   <div id="st0" style="font-size:13px;color:var(--mu);margin-top:6px">Foto yang terang dan lurus paling akurat. Hasil bacaan mengisi kolom di bawah, periksa dulu sebelum menyimpan.</div>
@@ -59,6 +63,7 @@ button.x{background:none;color:var(--rd);padding:4px 8px}
   </div>
   <div id="list"></div>
 </div>
+<p style="text-align:center;font-size:12px;color:var(--mu)">Versi 5</p>
 </main>
 <script>
 const KAT=['Makan','Belanja','Transport','Tagihan','Kesehatan','Lainnya'];
@@ -133,7 +138,27 @@ async function baca(f){
   }catch(err){st.textContent='Gagal membaca struk. Pastikan internet aktif saat pertama kali, atau isi manual.'}
 }
 [$('foto'),$('foto2')].forEach(i=>i.addEventListener('change',()=>{const f=i.files[0];if(f)baca(f)}));
-$('kam').onclick=()=>$('foto').click();
+let strm=null;
+function matikanKamera(){if(strm){strm.getTracks().forEach(t=>t.stop());strm=null}$('vid').srcObject=null;$('kmr').hidden=true}
+$('kam').onclick=async()=>{
+  const st=$('st0');
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){$('foto').click();return}
+  try{
+    strm=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1920},height:{ideal:1080}},audio:false});
+    $('vid').srcObject=strm;$('kmr').hidden=false;
+    try{await $('vid').play()}catch(e){}
+    st.textContent='Arahkan kamera ke struk, lalu tekan Ambil foto.';
+  }catch(e){
+    st.textContent='Kamera belum diizinkan. Izinkan kamera lewat pengaturan situs di Chrome, atau pakai Pilih dari galeri.';
+  }
+};
+$('jepret').onclick=()=>{
+  const v=$('vid');if(!v.videoWidth)return;
+  const c=document.createElement('canvas');c.width=v.videoWidth;c.height=v.videoHeight;c.getContext('2d').drawImage(v,0,0);
+  c.toBlob(b=>{matikanKamera();if(b)baca(b)},'image/jpeg',.92);
+};
+$('tutup').onclick=()=>{matikanKamera();$('st0').textContent='Kamera ditutup.'};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)matikanKamera()});
 $('gal').onclick=()=>$('foto2').click();
 
 $('simpan').onclick=()=>{

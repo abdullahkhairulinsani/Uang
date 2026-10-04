@@ -1,4 +1,4 @@
-const C='keuangan-v4';
+const C='keuangan-v5';
 const A=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png'];
 const X='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(async c=>{await c.addAll(A);try{await c.add(X)}catch(_){}}));self.skipWaiting()});
