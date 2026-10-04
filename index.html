@@ -33,8 +33,10 @@ button.x{background:none;color:var(--rd);padding:4px 8px}
 <main>
 <h1>🧾 Catatan Keuangan</h1>
 <div class="card">
-  <label for="foto">Foto struk (dibaca otomatis)</label>
-  <input id="foto" type="file" accept="image/*">
+  <label for="kam">Foto struk (dibaca otomatis)</label>
+  <div class="row"><button type="button" id="kam">Ambil foto</button><button type="button" class="sec" id="gal">Pilih dari galeri</button></div>
+  <input id="foto" type="file" accept="image/*" capture="environment" hidden>
+  <input id="foto2" type="file" accept="image/*" hidden>
   <div id="st0" style="font-size:13px;color:var(--mu);margin-top:6px">Foto yang terang dan lurus paling akurat. Hasil bacaan mengisi kolom di bawah, periksa dulu sebelum menyimpan.</div>
   <label for="tgl">Tanggal</label><input id="tgl" type="date">
   <label for="toko">Toko / keterangan</label><input id="toko" type="text" placeholder="Contoh: Indomaret">
@@ -106,8 +108,7 @@ function cariKat(t){for(const k in KATA)if(KATA[k].test(t))return k;return 'Lain
 function muatTesseract(){return new Promise((ok,no)=>{if(window.Tesseract)return ok();const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=ok;s.onerror=()=>no(new Error('muat'));document.head.append(s)})}
 function siapkan(f){return new Promise((ok,no)=>{const im=new Image(),u=URL.createObjectURL(f);im.onload=()=>{const s=Math.min(1,1800/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);const x=c.getContext('2d');try{x.filter='grayscale(1) contrast(1.4)'}catch(e){}x.drawImage(im,0,0,c.width,c.height);URL.revokeObjectURL(u);ok(c)};im.onerror=()=>no(new Error('gambar'));im.src=u})}
 
-$('foto').addEventListener('change',async e=>{
-  const f=e.target.files[0];if(!f)return;
+async function baca(f){
   const st=$('st0');
   try{
     st.textContent='Menyiapkan foto...';
@@ -130,14 +131,17 @@ $('foto').addEventListener('change',async e=>{
     const kurang=[!total&&'total',!tgl&&'tanggal',!toko&&'toko'].filter(Boolean);
     st.textContent=kurang.length?'Terbaca sebagian. Isi manual: '+kurang.join(', ')+'.':'Selesai dibaca. Periksa dulu, lalu tekan Simpan.';
   }catch(err){st.textContent='Gagal membaca struk. Pastikan internet aktif saat pertama kali, atau isi manual.'}
-});
+}
+[$('foto'),$('foto2')].forEach(i=>i.addEventListener('change',()=>{const f=i.files[0];if(f)baca(f)}));
+$('kam').onclick=()=>$('foto').click();
+$('gal').onclick=()=>$('foto2').click();
 
 $('simpan').onclick=()=>{
   const total=Number($('tot').value);
   if(!total||total<=0){$('st').textContent='Isi total pengeluaran dulu.';return}
   rows.push({id:Date.now(),tgl:$('tgl').value||hari(),toko:$('toko').value.trim()||'-',kat:$('kat').value,total});
   simpanLokal();
-  $('toko').value='';$('tot').value='';$('foto').value='';$('tgl').value=hari();
+  $('toko').value='';$('tot').value='';$('foto').value='';$('foto2').value='';$('tgl').value=hari();
   $('st').textContent='Tersimpan.';render();
 };
 
